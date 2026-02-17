@@ -3,17 +3,11 @@ use crate::{
     entities::editable::RequestEntityUpdateFromClass, Camera3D, GraniteTypes, IdentityData,
 };
 use bevy::{
-    camera::Camera,
-    ecs::{
+    asset::Assets, camera::Camera, ecs::{
         entity::Entity,
         message::MessageReader,
-        system::{Commands, Query},
-    },
-    light::{FogVolume, VolumetricFog as VolumetricFogSettings},
-    math::{UVec2, UVec3},
-    pbr::{Atmosphere, AtmosphereMode, AtmosphereSettings as BevyAtmosphereSettings},
-    post_process::bloom::{Bloom, BloomCompositeMode as BevyBloomCompositeMode},
-    render::view::Hdr,
+        system::{Commands, Query, ResMut},
+    }, light::{FogVolume, VolumetricFog as VolumetricFogSettings}, math::{UVec2, UVec3}, pbr::{Atmosphere, AtmosphereMode, AtmosphereSettings as BevyAtmosphereSettings, ScatteringMedium, ScatteringTerm}, post_process::bloom::{Bloom, BloomCompositeMode as BevyBloomCompositeMode}, render::view::Hdr
 };
 
 use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
@@ -42,6 +36,7 @@ impl Camera3D {
 /// Actually update the specific entity with the class data
 /// In the future im sure we will have FOV and what not
 pub fn update_camera_3d_system(
+    mut mediums: ResMut<Assets<ScatteringMedium>>,
     mut reader: MessageReader<UserUpdatedCamera3DEvent>,
     mut query: Query<(Entity, &mut Camera, &mut IdentityData)>,
     mut commands: Commands,
@@ -143,15 +138,7 @@ pub fn update_camera_3d_system(
                     bottom_radius: atmos_config.bottom_radius,
                     top_radius: atmos_config.top_radius,
                     ground_albedo: atmos_config.ground_albedo.into(),
-                    rayleigh_density_exp_scale: atmos_config.rayleigh_density_exp_scale,
-                    rayleigh_scattering: atmos_config.rayleigh_scattering.into(),
-                    mie_density_exp_scale: atmos_config.mie_density_exp_scale,
-                    mie_scattering: atmos_config.mie_scattering,
-                    mie_absorption: atmos_config.mie_absorption,
-                    mie_asymmetry: atmos_config.mie_asymmetry,
-                    ozone_layer_altitude: atmos_config.ozone_layer_altitude,
-                    ozone_layer_width: atmos_config.ozone_layer_width,
-                    ozone_absorption: atmos_config.ozone_absorption.into(),
+                    medium: mediums.add(atmos_config.as_medium())
                 };
 
                 commands.entity(entity).insert(Hdr);

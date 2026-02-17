@@ -163,7 +163,7 @@ pub fn camera_sync_toggle_system(
 pub fn enforce_viewport_camera_state(
     viewport_camera_state: Res<ViewportCameraState>,
     mut camera_query: Query<
-        (Entity, &mut Camera),
+        (Entity, &mut Camera, &RenderTarget),
         (With<Camera3d>, Without<UICamera>, Without<GizmoCamera>),
     >,
 ) {
@@ -173,11 +173,11 @@ pub fn enforce_viewport_camera_state(
 
     let mut active_found = false;
 
-    for (entity, mut camera) in camera_query.iter_mut() {
+    for (entity, mut camera, render_target) in camera_query.iter_mut() {
         if entity == active_camera_entity {
             active_found = true;
             camera.is_active = true;
-        } else if matches!(camera.target, RenderTarget::Window(_)) {
+        } else if matches!(render_target, RenderTarget::Window(_)) {
             camera.is_active = false;
         }
     }
@@ -196,7 +196,7 @@ pub fn restore_runtime_camera_state(
         (With<Camera3d>, Without<UICamera>, Without<GizmoCamera>),
     >,
     mut camera_query: Query<
-        (Entity, &mut Camera),
+        (Entity, &mut Camera, &RenderTarget),
         (With<Camera3d>, Without<UICamera>, Without<GizmoCamera>),
     >,
     main_camera_entities: Query<Entity, With<MainCamera>>,
@@ -232,8 +232,8 @@ pub fn restore_runtime_camera_state(
     let mut any_main_enabled = false;
 
     for entity in &main_entities {
-        if let Ok((_, mut camera)) = camera_query.get_mut(*entity) {
-            if matches!(camera.target, RenderTarget::Window(_)) {
+        if let Ok((_, mut camera, render_target)) = camera_query.get_mut(*entity) {
+            if matches!(render_target, RenderTarget::Window(_)) {
                 camera.is_active = true;
                 any_main_enabled = true;
             }
@@ -241,23 +241,23 @@ pub fn restore_runtime_camera_state(
     }
 
     if any_main_enabled {
-        for (entity, mut camera) in camera_query.iter_mut() {
-            if !main_entities.contains(&entity) && matches!(camera.target, RenderTarget::Window(_))
+        for (entity, mut camera, render_target) in camera_query.iter_mut() {
+            if !main_entities.contains(&entity) && matches!(render_target, RenderTarget::Window(_))
             {
                 camera.is_active = false;
             }
         }
     } else {
-        for (_, mut camera) in camera_query.iter_mut() {
-            if matches!(camera.target, RenderTarget::Window(_)) {
+        for (_, mut camera, render_target) in camera_query.iter_mut() {
+            if matches!(render_target, RenderTarget::Window(_)) {
                 camera.is_active = true;
             }
         }
     }
 
     // Clear ALL custom viewports when exiting editor
-    for (_, mut camera) in camera_query.iter_mut() {
-        if matches!(camera.target, RenderTarget::Window(_)) {
+    for (_, mut camera, render_target) in camera_query.iter_mut() {
+        if matches!(render_target, RenderTarget::Window(_)) {
             camera.viewport = None;
         }
     }
@@ -273,7 +273,7 @@ pub fn handle_viewport_camera_override_requests(
         &mut Transform,
         (With<Camera3d>, Without<UICamera>, Without<GizmoCamera>),
     >,
-    camera_meta_query: Query<&Camera, (With<Camera3d>, Without<UICamera>, Without<GizmoCamera>)>,
+    camera_meta_query: Query<(&Camera, &RenderTarget), (With<Camera3d>, Without<UICamera>, Without<GizmoCamera>)>,
     render_layers_query: Query<
         &RenderLayers,
         (With<Camera3d>, Without<UICamera>, Without<GizmoCamera>),
@@ -304,7 +304,7 @@ pub fn handle_viewport_camera_override_requests(
                 }
             }
 
-            let Ok(target_camera) = camera_meta_query.get(*target_entity) else {
+            let Ok((target_camera, render_target)) = camera_meta_query.get(*target_entity) else {
                 log!(
                     LogType::Editor,
                     LogLevel::Warning,
@@ -315,7 +315,7 @@ pub fn handle_viewport_camera_override_requests(
                 continue;
             };
 
-            if !matches!(target_camera.target, RenderTarget::Window(_)) {
+            if !matches!(render_target, RenderTarget::Window(_)) {
                 log!(
                     LogType::Editor,
                     LogLevel::Warning,

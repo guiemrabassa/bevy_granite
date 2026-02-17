@@ -61,6 +61,7 @@ pub fn dock_ui_system(
         Entity,
         Option<&Name>,
         &Camera,
+        &RenderTarget,
         Option<&Camera3d>,
         Option<&EditorViewportCamera>,
         Option<&UICamera>,
@@ -71,12 +72,12 @@ pub fn dock_ui_system(
     let mut camera_options: Vec<(Entity, String)> = camera_query
         .iter()
         .filter_map(
-            |(entity, name, camera, camera3d, editor_camera, ui_camera, gizmo_camera)| {
+            |(entity, name, camera, render_target, camera3d, editor_camera, ui_camera, gizmo_camera)| {
                 if camera3d.is_some()
                     && editor_camera.is_none()
                     && ui_camera.is_none()
                     && gizmo_camera.is_none()
-                    && matches!(camera.target, RenderTarget::Window(_))
+                    && matches!(render_target, RenderTarget::Window(_))
                 {
                     let label = name
                         .map(|n| n.as_str().to_string())

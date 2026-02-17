@@ -1,6 +1,6 @@
 use crate::selection::{events::EntityEvents, ActiveSelection, Selected};
 use bevy::{
-    ecs::{lifecycle::Add, observer::On},
+    ecs::{entity::EntityIndex, lifecycle::Add, observer::On},
     prelude::{Component, Entity, Query, Res, With},
 };
 use bevy::{
@@ -143,7 +143,7 @@ pub fn handle_picking_selection(
                 return;
             }
         }
-        Err(QueryEntityError::EntityDoesNotExist(_)) => {
+        Err(QueryEntityError::NotSpawned(_)) => {
             log!("Entity does not exist: {}", on_click.entity.index());
             return;
         }
@@ -153,7 +153,7 @@ pub fn handle_picking_selection(
         return;
     }
 
-    if on_click.entity.index() == 0 {
+    if on_click.entity.index() == EntityIndex::from_raw_u32(0).unwrap() {
         log!(
             LogType::Editor,
             LogLevel::Info,

@@ -291,7 +291,7 @@ fn combobox_style_button(ui: &mut Ui, button_text: &str) -> Response {
                 .unwrap_or_else(|| ui.visuals().text_color())
         };
 
-        let text_galley = ui.fonts(|f| {
+        let text_galley = ui.fonts_mut(|f| {
             f.layout_no_wrap(
                 button_text.to_string(),
                 egui::TextStyle::Button.resolve(ui.style()),

@@ -4,8 +4,15 @@ use crate::{
     HasRuntimeData, IdentityData,
 };
 use bevy::{
+    asset::Assets,
     camera::{Camera, Camera3d},
-    ecs::{bundle::Bundle, entity::Entity, system::Commands},
+    ecs::{
+        bundle::Bundle,
+        entity::Entity,
+        system::{Commands, ResMut},
+        world::World,
+    },
+    pbr::ScatteringMedium,
     post_process::bloom::{Bloom, BloomCompositeMode as BevyBloomCompositeMode},
     prelude::Name,
     render::view::Hdr,
@@ -53,120 +60,136 @@ impl Camera3D {
         commands: &mut Commands,
         transform: Transform,
     ) -> Entity {
-        let mut entity =
-            commands.spawn(Self::get_bundle(self.clone(), identity.clone(), transform));
+        let id = {
+            let mut entity =
+                commands.spawn(Self::get_bundle(self.clone(), identity.clone(), transform));
 
-        // Handle dithering
-        if self.dither {
-            entity.insert(bevy::core_pipeline::tonemapping::DebandDither::Enabled);
-        }
-
-        // Handle bloom - requires HDR
-        if self.has_bloom {
-            // Bloom requires HDR to be enabled
-            entity.insert(Hdr);
-            
-            if let Some(bloom_settings) = &self.bloom_settings {
-                let bloom = Bloom {
-                    intensity: bloom_settings.intensity,
-                    low_frequency_boost: bloom_settings.low_frequency_boost,
-                    low_frequency_boost_curvature: bloom_settings.low_frequency_boost_curvature,
-                    high_pass_frequency: bloom_settings.high_pass_frequency,
-                    composite_mode: match bloom_settings.composite_mode {
-                        super::BloomCompositeMode::EnergyConserving => BevyBloomCompositeMode::EnergyConserving,
-                        super::BloomCompositeMode::Additive => BevyBloomCompositeMode::Additive,
-                    },
-                    ..Default::default()
-                };
-                entity.insert(bloom);
-            } else {
-                entity.insert(Bloom::default());
+            // Handle dithering
+            if self.dither {
+                entity.insert(bevy::core_pipeline::tonemapping::DebandDither::Enabled);
             }
-        }
 
-        if self.has_volumetric_fog {
-            let mut fog = bevy::light::VolumetricFog::default();
-            let mut fog_volume = bevy::light::FogVolume::default();
+            // Handle bloom - requires HDR
+            if self.has_bloom {
+                // Bloom requires HDR to be enabled
+                entity.insert(Hdr);
 
-            if let Some(fog_settings) = &self.volumetric_fog_settings {
-                fog.ambient_color = fog_settings.ambient_color;
-                fog.ambient_intensity = fog_settings.ambient_intensity;
-                fog.step_count = fog_settings.step_count;
-                fog_volume.fog_color = fog_settings.fog_color;
-                fog_volume.absorption = fog_settings.absorption;
-                fog_volume.light_intensity = fog_settings.light_intensity;
-                fog_volume.light_tint = fog_settings.light_tint;
-                fog_volume.density_factor = fog_settings.density;
-                fog_volume.scattering = fog_settings.scattering;
-                fog_volume.scattering_asymmetry = fog_settings.scattering_asymmetry;
-
-                // TODO: work out the bevy 0.16 equivalent for max_depth
-                // entity.insert(VolumetricFogSettings {
-                //     max_depth: fog_settings.max_depth,
-                // });
+                if let Some(bloom_settings) = &self.bloom_settings {
+                    let bloom = Bloom {
+                        intensity: bloom_settings.intensity,
+                        low_frequency_boost: bloom_settings.low_frequency_boost,
+                        low_frequency_boost_curvature: bloom_settings.low_frequency_boost_curvature,
+                        high_pass_frequency: bloom_settings.high_pass_frequency,
+                        composite_mode: match bloom_settings.composite_mode {
+                            super::BloomCompositeMode::EnergyConserving => {
+                                BevyBloomCompositeMode::EnergyConserving
+                            }
+                            super::BloomCompositeMode::Additive => BevyBloomCompositeMode::Additive,
+                        },
+                        ..Default::default()
+                    };
+                    entity.insert(bloom);
+                } else {
+                    entity.insert(Bloom::default());
+                }
             }
-            //I don't know if the fog volume should be attached to the camera or its own entity
-            entity.insert((fog, fog_volume));
-        }
+
+            if self.has_volumetric_fog {
+                let mut fog = bevy::light::VolumetricFog::default();
+                let mut fog_volume = bevy::light::FogVolume::default();
+
+                if let Some(fog_settings) = &self.volumetric_fog_settings {
+                    fog.ambient_color = fog_settings.ambient_color;
+                    fog.ambient_intensity = fog_settings.ambient_intensity;
+                    fog.step_count = fog_settings.step_count;
+                    fog_volume.fog_color = fog_settings.fog_color;
+                    fog_volume.absorption = fog_settings.absorption;
+                    fog_volume.light_intensity = fog_settings.light_intensity;
+                    fog_volume.light_tint = fog_settings.light_tint;
+                    fog_volume.density_factor = fog_settings.density;
+                    fog_volume.scattering = fog_settings.scattering;
+                    fog_volume.scattering_asymmetry = fog_settings.scattering_asymmetry;
+
+                    // TODO: work out the bevy 0.16 equivalent for max_depth
+                    // entity.insert(VolumetricFogSettings {
+                    //     max_depth: fog_settings.max_depth,
+                    // });
+                }
+                //I don't know if the fog volume should be attached to the camera or its own entity
+                entity.insert((fog, fog_volume));
+            }
+
+            entity.id()
+        };
 
         // Handle atmosphere settings
         if self.has_atmosphere {
             if let Some(atmos_settings) = &self.atmosphere_settings {
                 // Always use custom values from the settings
-                let atmosphere = bevy::pbr::Atmosphere {
-                    bottom_radius: atmos_settings.bottom_radius,
-                    top_radius: atmos_settings.top_radius,
-                    ground_albedo: atmos_settings.ground_albedo.into(),
-                    rayleigh_density_exp_scale: atmos_settings.rayleigh_density_exp_scale,
-                    rayleigh_scattering: atmos_settings.rayleigh_scattering.into(),
-                    mie_density_exp_scale: atmos_settings.mie_density_exp_scale,
-                    mie_scattering: atmos_settings.mie_scattering,
-                    mie_absorption: atmos_settings.mie_absorption,
-                    mie_asymmetry: atmos_settings.mie_asymmetry,
-                    ozone_layer_altitude: atmos_settings.ozone_layer_altitude,
-                    ozone_layer_width: atmos_settings.ozone_layer_width,
-                    ozone_absorption: atmos_settings.ozone_absorption.into(),
-                };
-                entity.insert(Hdr);
-                entity.insert(atmosphere);
 
-                // Add AtmosphereSettings component with all LUT settings
-                entity.insert(bevy::pbr::AtmosphereSettings {
-                    transmittance_lut_size: bevy::math::UVec2::new(
-                        atmos_settings.transmittance_lut_size.0,
-                        atmos_settings.transmittance_lut_size.1,
-                    ),
-                    multiscattering_lut_size: bevy::math::UVec2::new(
-                        atmos_settings.multiscattering_lut_size.0,
-                        atmos_settings.multiscattering_lut_size.1,
-                    ),
-                    sky_view_lut_size: bevy::math::UVec2::new(
-                        atmos_settings.sky_view_lut_size.0,
-                        atmos_settings.sky_view_lut_size.1,
-                    ),
-                    aerial_view_lut_size: bevy::math::UVec3::new(
-                        atmos_settings.aerial_view_lut_size.0,
-                        atmos_settings.aerial_view_lut_size.1,
-                        atmos_settings.aerial_view_lut_size.2,
-                    ),
-                    transmittance_lut_samples: atmos_settings.transmittance_lut_samples,
-                    multiscattering_lut_dirs: atmos_settings.multiscattering_lut_dirs,
-                    multiscattering_lut_samples: atmos_settings.multiscattering_lut_samples,
-                    sky_view_lut_samples: atmos_settings.sky_view_lut_samples,
-                    aerial_view_lut_samples: atmos_settings.aerial_view_lut_samples,
-                    aerial_view_lut_max_distance: atmos_settings.aerial_view_lut_max_distance,
-                    scene_units_to_m: atmos_settings.scene_units_to_m,
-                    sky_max_samples: atmos_settings.sky_max_samples,
-                    rendering_method: match atmos_settings.rendering_method {
-                        super::AtmosphereRenderingMethod::LookupTexture => bevy::pbr::AtmosphereMode::LookupTexture,
-                        super::AtmosphereRenderingMethod::Raymarched => bevy::pbr::AtmosphereMode::Raymarched,
-                    },
-                    ..Default::default()
+                let atmos_settings = atmos_settings.clone();
+                let id = id.clone();
+                commands.queue(move |world: &mut World| {
+                    let medium = {
+                        let mut mediums = world.resource_mut::<Assets<ScatteringMedium>>();
+                        mediums.add(atmos_settings.as_medium())
+                    };
+
+                    let mut commands = world.commands();
+                    let mut entity = commands.entity(id.clone());
+
+                    let atmosphere = bevy::pbr::Atmosphere {
+                        bottom_radius: atmos_settings.bottom_radius,
+                        top_radius: atmos_settings.top_radius,
+                        ground_albedo: atmos_settings.ground_albedo.into(),
+                        medium,
+                    };
+
+                    entity.insert(Hdr);
+                    entity.insert(atmosphere);
+
+                    // Add AtmosphereSettings component with all LUT settings
+                    entity.insert(bevy::pbr::AtmosphereSettings {
+                        transmittance_lut_size: bevy::math::UVec2::new(
+                            atmos_settings.transmittance_lut_size.0,
+                            atmos_settings.transmittance_lut_size.1,
+                        ),
+                        multiscattering_lut_size: bevy::math::UVec2::new(
+                            atmos_settings.multiscattering_lut_size.0,
+                            atmos_settings.multiscattering_lut_size.1,
+                        ),
+                        sky_view_lut_size: bevy::math::UVec2::new(
+                            atmos_settings.sky_view_lut_size.0,
+                            atmos_settings.sky_view_lut_size.1,
+                        ),
+                        aerial_view_lut_size: bevy::math::UVec3::new(
+                            atmos_settings.aerial_view_lut_size.0,
+                            atmos_settings.aerial_view_lut_size.1,
+                            atmos_settings.aerial_view_lut_size.2,
+                        ),
+                        transmittance_lut_samples: atmos_settings.transmittance_lut_samples,
+                        multiscattering_lut_dirs: atmos_settings.multiscattering_lut_dirs,
+                        multiscattering_lut_samples: atmos_settings.multiscattering_lut_samples,
+                        sky_view_lut_samples: atmos_settings.sky_view_lut_samples,
+                        aerial_view_lut_samples: atmos_settings.aerial_view_lut_samples,
+                        aerial_view_lut_max_distance: atmos_settings.aerial_view_lut_max_distance,
+                        scene_units_to_m: atmos_settings.scene_units_to_m,
+                        sky_max_samples: atmos_settings.sky_max_samples,
+                        rendering_method: match atmos_settings.rendering_method {
+                            super::AtmosphereRenderingMethod::LookupTexture => {
+                                bevy::pbr::AtmosphereMode::LookupTexture
+                            }
+                            super::AtmosphereRenderingMethod::Raymarched => {
+                                bevy::pbr::AtmosphereMode::Raymarched
+                            }
+                        },
+                        ..Default::default()
+                    });
                 });
             }
         }
 
-        entity.id()
+        id.clone()
     }
 
     /// Build a bundle that is ready to spawn from a Camera3D

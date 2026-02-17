@@ -1,6 +1,8 @@
 use crate::entities::editable::{GraniteType, RequestEntityUpdateFromClass};
 use crate::{entities::EntitySaveReadyData, AvailableEditableMaterials};
 use bevy::ecs::message::Message;
+use bevy::math::Vec3;
+use bevy::pbr::{Falloff, PhaseFunction, ScatteringMedium, ScatteringTerm};
 use bevy::{
     asset::{AssetServer, Assets},
     color::Color,
@@ -59,7 +61,7 @@ impl Default for Camera3D {
     fn default() -> Self {
         Self {
             is_active: true,
-            order: 0, 
+            order: 0,
             dither: true, // Enable dithering by default
             has_bloom: false,
             bloom_settings: None,
@@ -149,10 +151,10 @@ pub enum AtmosphereRenderingMethod {
 #[derive(Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 pub struct AtmosphereSettings {
     // LUT (Look-Up Table) Settings
-    pub transmittance_lut_size: (u32, u32),     
-    pub multiscattering_lut_size: (u32, u32),   
-    pub sky_view_lut_size: (u32, u32),          
-    pub aerial_view_lut_size: (u32, u32, u32),  
+    pub transmittance_lut_size: (u32, u32),
+    pub multiscattering_lut_size: (u32, u32),
+    pub sky_view_lut_size: (u32, u32),
+    pub aerial_view_lut_size: (u32, u32, u32),
     pub transmittance_lut_samples: u32,
     pub multiscattering_lut_dirs: u32,
     pub multiscattering_lut_samples: u32,
@@ -162,13 +164,13 @@ pub struct AtmosphereSettings {
     pub scene_units_to_m: f32,
     pub sky_max_samples: u32,
     pub rendering_method: AtmosphereRenderingMethod,
-    
+
     // Atmosphere component fields
     pub bottom_radius: f32,
     pub top_radius: f32,
-    pub ground_albedo: (f32, f32, f32), 
+    pub ground_albedo: (f32, f32, f32),
     pub rayleigh_density_exp_scale: f32,
-    pub rayleigh_scattering: (f32, f32, f32), 
+    pub rayleigh_scattering: (f32, f32, f32),
     pub mie_density_exp_scale: f32,
     pub mie_scattering: f32,
     pub mie_absorption: f32,
@@ -195,7 +197,7 @@ impl Default for AtmosphereSettings {
             scene_units_to_m: 1.0,
             sky_max_samples: 16,
             rendering_method: AtmosphereRenderingMethod::LookupTexture,
-            
+
             // Atmosphere settings (Earth-like defaults)
             bottom_radius: 6360000.0,
             top_radius: 6460000.0,
@@ -210,6 +212,57 @@ impl Default for AtmosphereSettings {
             ozone_layer_width: 15000.0,
             ozone_absorption: (0.000650, 0.001881, 0.000085),
         }
+    }
+}
+
+impl AtmosphereSettings {
+    pub fn as_medium(&self) -> ScatteringMedium {
+        let medium = ScatteringMedium::default();
+
+        ScatteringMedium::new(
+            medium.falloff_resolution,
+            medium.phase_resolution,
+            [
+                // Rayleigh scattering Term
+                ScatteringTerm {
+                    absorption: Vec3::ZERO,
+                    scattering: Vec3::new(
+                        self.rayleigh_scattering.0,
+                        self.rayleigh_scattering.1,
+                        self.rayleigh_scattering.2,
+                    ),
+                    falloff: Falloff::Exponential {
+                        scale: self.rayleigh_density_exp_scale,
+                    },
+                    phase: PhaseFunction::Rayleigh,
+                },
+                // Mie scattering Term
+                ScatteringTerm {
+                    absorption: Vec3::splat(self.mie_absorption),
+                    scattering: Vec3::splat(self.mie_scattering),
+                    falloff: Falloff::Exponential {
+                        scale: self.mie_density_exp_scale,
+                    },
+                    phase: PhaseFunction::Mie {
+                        asymmetry: self.mie_asymmetry,
+                    },
+                },
+                // Ozone scattering Term
+                ScatteringTerm {
+                    absorption: Vec3::new(
+                        self.ozone_absorption.0,
+                        self.ozone_absorption.1,
+                        self.ozone_absorption.2,
+                    ),
+                    scattering: Vec3::ZERO,
+                    falloff: Falloff::Tent {
+                        center: self.ozone_layer_altitude,
+                        width: self.ozone_layer_width,
+                    },
+                    phase: PhaseFunction::Isotropic,
+                },
+            ],
+        )
     }
 }
 

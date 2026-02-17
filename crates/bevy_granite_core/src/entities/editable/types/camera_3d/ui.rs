@@ -329,7 +329,7 @@ impl Camera3D {
                                 ui.horizontal(|ui| {
                                     // Button to reset to Earth preset values from Bevy::Atmosphere::EARTH
                                     if ui.button("Earth").clicked() {
-                                        let earth = bevy::pbr::Atmosphere::EARTH;
+                                        /* let earth = bevy::pbr::Atmosphere::EARTH;
                                         atmos_settings.bottom_radius = earth.bottom_radius;
                                         atmos_settings.scene_units_to_m = 1e+4;
                                         atmos_settings.aerial_view_lut_max_distance = 3.2e5;
@@ -359,12 +359,12 @@ impl Camera3D {
                                             earth.ozone_absorption.y,
                                             earth.ozone_absorption.z,
                                         );
-                                        changed = true;
+                                        changed = true; */
                                     }
                                     ui.add_space(small_spacing);
 
                                     if ui.button("Earth - Ground").clicked() {
-                                        let earth = bevy::pbr::Atmosphere::EARTH;
+                                        /* let earth = bevy::pbr::Atmosphere::EARTH;
                                         atmos_settings.bottom_radius = 6_360_000.;
                                         atmos_settings.top_radius = 6_370_000.;
                                         atmos_settings.scene_units_to_m = 1.;
@@ -394,7 +394,7 @@ impl Camera3D {
                                             earth.ozone_absorption.y,
                                             earth.ozone_absorption.z,
                                         );
-                                        changed = true;
+                                        changed = true; */
                                     }
                                 });
                                 ui.end_row();

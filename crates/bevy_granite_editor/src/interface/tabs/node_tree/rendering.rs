@@ -80,7 +80,7 @@ fn render_virtual_hierarchical_tree(ui: &mut egui::Ui, data: &mut NodeTreeTabDat
 
     let available_height = ui.available_height();
     let font_id = egui::TextStyle::Button.resolve(ui.style());
-    let row_height = ui.fonts(|f| f.row_height(&font_id)) + ui.spacing().button_padding.y * 2.0;
+    let row_height = ui.fonts_mut(|f| f.row_height(&font_id)) + ui.spacing().button_padding.y * 2.0;
 
     data.virtual_scroll_state.row_height = row_height;
     data.virtual_scroll_state.total_rows = data.flattened_tree_cache.len();
@@ -248,7 +248,7 @@ fn render_virtual_tree_node(
         ui.add_space(indent_size);
 
         let font_id = egui::TextStyle::Button.resolve(ui.style());
-        let icon_size = ui.fonts(|f| f.row_height(&font_id));
+        let icon_size = ui.fonts_mut(|f| f.row_height(&font_id));
 
         // Icon allocation for expand/collapse triangle
         let (icon_rect, icon_response) =

@@ -37,8 +37,8 @@ impl Plugin for SelectionPlugin {
             .add_systems(
                 Update,
                 (
-                    duplicate_entity_system.after(handle_picking_selection),
-                    duplicate_all_selection_system.after(handle_picking_selection),
+                    duplicate_entity_system,
+                    duplicate_all_selection_system,
                 )
                     .run_if(is_gizmos_active),
             )
